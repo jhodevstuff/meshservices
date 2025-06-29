@@ -111,7 +111,7 @@ def warn_background_loop():
                 except Exception as e:
                     print(f"{datetime.now()} - Error sending warning to channel: {e}")
             warned_ids.update(neue_ids)
-        time.sleep(300)
+        time.sleep(900)
         
 # Log all messages (no service requests)
 def log_json_message(entry, log_file, api_url, api_key):
@@ -552,14 +552,14 @@ def send_message_to_node(nodeid, text):
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
                 if result.returncode != 0 or result.stderr:
                     raise Exception(result.stderr)
-                print(f"{datetime.now()} - Message sent to node {nodeid}. Output: {result.stdout} Error: {result.stderr}")
+                print(f"{datetime.now()} - Message sent to node: {nodeid}")
             except Exception as e:
                 print(f"{datetime.now()} - Error on first send attempt: {str(e)}. Second attempt with 30s timeout...")
                 try:
                     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
                     if result.returncode != 0 or result.stderr:
                         raise Exception(result.stderr)
-                    print(f"{datetime.now()} - Message sent to node {nodeid} on second attempt. Output: {result.stdout} Error: {result.stderr}")
+                    print(f"{datetime.now()} - Message sent to node: {nodeid} on second attempt.")
                 except Exception as e2:
                     print(f"{datetime.now()} - Error on second send attempt to node {nodeid}: {str(e2)}")
             time.sleep(2)
