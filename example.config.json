@@ -1,0 +1,60 @@
+{
+  "serial": {
+    "port": ["/dev/tty.usbserial-0001", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/tty.usbmodem101"]
+  },
+  "services": {
+    "mail": true,
+    "test": true,
+    "wetter": true,
+    "google": true,
+    "news": true,
+    "wiki": true,
+    "translate": true,
+    "warn": true,
+    "radar": true,
+    "ignore": true
+  },
+  "log": {
+    "enabled": false,
+    "api_url": "https://example.com/api/meshlog.php",
+    "api_key": "your-log-api-key"
+  },
+  "mail": {
+    "smtp": {
+      "server": "smtp.example.com",
+      "port": "587",
+      "user": "user@example.com",
+      "password": "your-smtp-password"
+    },
+    "default_sender": "Mesh-Service"
+  },
+  "weather": {
+    "api_key": "your-weather-api-key",
+    "provider": "wttr.in"
+  },
+  "php": {
+    "api_key": "your-php-api-key"
+  },
+  "radar_channel_index": 3,
+  "radar": {
+    "Radar-1": {
+      "mail": true,
+      "ignore": false,
+      "mail_to": "admin1@example.com"
+    },
+    "Radar-2": {
+      "mail": true,
+      "ignore": false,
+      "mail_to": "admin2@example.com"
+    },
+    "Radar-3": {
+      "mail": "02:00-06:00",
+      "ignore": false,
+      "mail_to": "admin3@example.com"
+    },
+    "Radar-Ignore": {
+      "mail": false,
+      "ignore": true
+    }
+  }
+}

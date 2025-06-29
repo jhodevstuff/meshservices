@@ -1,0 +1,6 @@
+.env
+*.log
+*.jsonl
+meshlog.html
+getmeshlog.php
+config.json
