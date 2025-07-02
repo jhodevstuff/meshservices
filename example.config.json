@@ -1,6 +1,6 @@
 {
   "serial": {
-    "port": ["/dev/tty.usbserial-0001", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/tty.usbmodem101"]
+    "port": ["/dev/tty.usbserial-0001", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/tty.usbmodem101", "/dev/tty.usbmodem1101", "/dev/tty.usbmodem2101"]
   },
   "services": {
     "mail": true,
@@ -12,7 +12,8 @@
     "translate": true,
     "warn": true,
     "radar": true,
-    "ignore": true
+    "ignore": true,
+    "echo": true
   },
   "log": {
     "enabled": false,
@@ -40,21 +41,25 @@
     "Radar-1": {
       "mail": true,
       "ignore": false,
-      "mail_to": "admin1@example.com"
+      "mail_to": "admin1@example.com",
+      "postStateInfo": false
     },
     "Radar-2": {
       "mail": true,
       "ignore": false,
-      "mail_to": "admin2@example.com"
+      "mail_to": "admin2@example.com",
+      "postStateInfo": true
     },
     "Radar-3": {
       "mail": "02:00-06:00",
       "ignore": false,
-      "mail_to": "admin3@example.com"
+      "mail_to": "admin3@example.com",
+      "postStateInfo": false
     },
     "Radar-Ignore": {
       "mail": false,
-      "ignore": true
+      "ignore": true,
+      "postStateInfo": false
     }
   }
 }

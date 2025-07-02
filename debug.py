@@ -6,7 +6,7 @@ from datetime import datetime
 # simple serial monitor
 
 def load_config():
-    with open('config_serial.json') as config_file:
+    with open('config.json') as config_file:
         return json.load(config_file)
 
 def find_serial_port(port_list):

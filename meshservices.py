@@ -419,6 +419,11 @@ def radar_service(message, nodeid):
     radar_name = parts[0] if parts else None
     is_notify = any(p.lower() == "$notify" for p in parts)
     radar_settings = radar_config.get(radar_name, {"mail": False, "ignore": False})
+    if "state:" in cleaned:
+        post_state_info = radar_settings.get("postStateInfo", False)
+        if not post_state_info:
+            print(f"{datetime.now()} - Radar state info for '{radar_name}' ignored (postStateInfo not enabled).")
+            return
     ignore = radar_settings.get("ignore", False)
     mail_setting = radar_settings.get("mail", False)
     mail_to = radar_settings.get("mail_to")
@@ -497,7 +502,51 @@ def radar_service(message, nodeid):
 def ignore_service(message, nodeid):
     pass
 
-# Service-Registry
+def info_service(message, nodeid):
+    services_config = load_services_config()
+    enabled = [name for name, active in services_config.items() if active and name in SERVICES and SERVICES[name]]
+    if not enabled:
+        enabled = [name for name in SERVICES if SERVICES[name]]
+    enabled.sort()
+    msg = "Aktivierte Services:\r" + '\r'.join([f"@{name}" for name in enabled])
+    send_message_to_node(nodeid, msg)
+
+def echo_service(message, nodeid):
+    if nodeid.startswith('0x'):
+        nodeid = '!' + nodeid[2:]
+    msg = message.strip()
+    echo_prefix = f"[ECHO/{nodeid}] "
+    max_len = 200
+    allowed_len = max_len - len(echo_prefix)
+    if len(msg) > allowed_len:
+        msg = msg[:allowed_len]
+    echo_msg = echo_prefix + msg
+    cli_path = get_meshtastic_cli_path()
+    cmd = f"{cli_path} --ch-index 0 --sendtext '{echo_msg}'"
+    global ser
+    ser_was_open = False
+    try:
+        try:
+            if ser and ser.is_open:
+                ser.close()
+                ser_was_open = True
+                print(f"{datetime.now()} - Serial port closed for sending (Echo).")
+        except Exception:
+            pass
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+        if result.returncode != 0 or result.stderr:
+            raise Exception(result.stderr)
+        print(f"{datetime.now()} - Echo message sent to channel 0: {echo_msg}")
+    except Exception as e:
+        print(f"{datetime.now()} - Error sending echo message to channel 0: {str(e)}")
+    time.sleep(2)
+    try:
+        if ser_was_open and not ser.is_open:
+            ser.open()
+            print(f"{datetime.now()} - Serial port reopened.")
+    except Exception as e:
+        print(f"{datetime.now()} - Error reopening serial port: {str(e)}")
+
 SERVICES = {
     'mail': mail_service,
     'test': test_service,
@@ -510,6 +559,8 @@ SERVICES = {
     'warn': warn_service,
     'radar': radar_service,
     'ignore': ignore_service,
+    'echo': echo_service,
+    'info': info_service,
 }
 
 def find_serial_port(port_list):
@@ -526,7 +577,6 @@ def get_meshtastic_cli_path():
         return cli_path
     return "meshtastic"
 
-# Send message to node
 def send_message_to_node(nodeid, text):
     if not text or not str(text).strip():
         return
@@ -575,6 +625,8 @@ def send_message_to_node(nodeid, text):
 def is_service_enabled(servicename):
     try:
         config = load_services_config()
+        if servicename == 'echo':
+            return config.get('echo', True)
         return config.get(servicename, True)
     except Exception:
         return True
