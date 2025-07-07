@@ -415,10 +415,28 @@ def radar_service(message, nodeid):
                 return now >= start or now <= end
         except Exception:
             return False
+    if not hasattr(radar_service, "_detection_times"):
+        radar_service._detection_times = {}
+    detection_times = radar_service._detection_times
     parts = cleaned.split()
     radar_name = parts[0] if parts else None
     is_notify = any(p.lower() == "$notify" for p in parts)
     radar_settings = radar_config.get(radar_name, {"mail": False, "ignore": False})
+    dta = radar_settings.get("detectionsToAlert", {"timeSpan": 0, "detections": 0})
+    dta_time = int(dta.get("timeSpan", 0))
+    dta_count = int(dta.get("detections", 0))
+    allow_trigger = True
+    if dta_time > 0 and dta_count > 0:
+        now_ts = time.time()
+        if radar_name not in detection_times:
+            detection_times[radar_name] = []
+        detection_times[radar_name] = [t for t in detection_times[radar_name] if now_ts - t <= dta_time]
+        detection_times[radar_name].append(now_ts)
+        if len(detection_times[radar_name]) < dta_count:
+            allow_trigger = False
+    if not allow_trigger:
+        print(f"{datetime.now()} - Radar '{radar_name}': Not enough detections ({len(detection_times[radar_name])}/{dta_count}) in {dta_time}s.")
+        return
     if "state:" in cleaned:
         post_state_info = radar_settings.get("postStateInfo", False)
         if not post_state_info:
