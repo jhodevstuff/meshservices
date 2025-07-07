@@ -422,6 +422,11 @@ def radar_service(message, nodeid):
     radar_name = parts[0] if parts else None
     is_notify = any(p.lower() == "$notify" for p in parts)
     radar_settings = radar_config.get(radar_name, {"mail": False, "ignore": False})
+    alias_name = radar_settings.get("aliasName")
+    def radar_display_name():
+        if alias_name:
+            return f"{radar_name} ({alias_name})"
+        return radar_name
     dta = radar_settings.get("detectionsToAlert", {"timeSpan": 0, "detections": 0})
     dta_time = int(dta.get("timeSpan", 0))
     dta_count = int(dta.get("detections", 0))
@@ -435,12 +440,12 @@ def radar_service(message, nodeid):
         if len(detection_times[radar_name]) < dta_count:
             allow_trigger = False
     if not allow_trigger:
-        print(f"{datetime.now()} - Radar '{radar_name}': Not enough detections ({len(detection_times[radar_name])}/{dta_count}) in {dta_time}s.")
+        print(f"{datetime.now()} - Radar '{radar_display_name()}': Not enough detections ({len(detection_times[radar_name])}/{dta_count}) in {dta_time}s.")
         return
     if "state:" in cleaned:
         post_state_info = radar_settings.get("postStateInfo", False)
         if not post_state_info:
-            print(f"{datetime.now()} - Radar state info for '{radar_name}' ignored (postStateInfo not enabled).")
+            print(f"{datetime.now()} - Radar state info for '{radar_display_name()}' ignored (postStateInfo not enabled).")
             return
     ignore = radar_settings.get("ignore", False)
     mail_setting = radar_settings.get("mail", False)
@@ -468,8 +473,8 @@ def radar_service(message, nodeid):
         from email.mime.text import MIMEText
         import smtplib
         now_full = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        subject = f"Radar alert from {radar_name}"
-        content = f"{cleaned}\n\nTime: {now_full}"
+        subject = f"Radar alert from {radar_display_name()}"
+        content = f"{cleaned}\n\nRadar: {radar_display_name()}\nTime: {now_full}"
         msg = MIMEText(content)
         msg['Subject'] = subject
         msg['From'] = f"{DEFAULT_SENDER_NAME} <{SMTP_USER}>"
@@ -479,11 +484,11 @@ def radar_service(message, nodeid):
                 server.starttls()
                 server.login(SMTP_USER, SMTP_PASSWORD)
                 server.send_message(msg)
-            print(f"{datetime.now()} - Radar alert mail sent to {mail_to} (Radar: {radar_name})")
+            print(f"{datetime.now()} - Radar alert mail sent to {mail_to} (Radar: {radar_display_name()})")
         except Exception as e:
             print(f"{datetime.now()} - Error sending radar alert mail: {str(e)}")
     now = datetime.now().strftime('%H:%M:%S')
-    cleaned_with_time = f"[{now}] {cleaned}"
+    cleaned_with_time = f"[{now}] {cleaned} (Radar: {radar_display_name()})"
     cli_path = get_meshtastic_cli_path()
     cmd = f"{cli_path} --ch-index {radar_channel} --sendtext '{cleaned_with_time}'"
     global ser
