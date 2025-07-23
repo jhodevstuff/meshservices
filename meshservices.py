@@ -502,14 +502,16 @@ def radar_service(message, nodeid):
     if api_url and api_key and radar_name:
         try:
             timestamp = int(time.time())
+            friendly = alias_name if alias_name else radar_name
             payload = {
                 'key': api_key,
                 'name': radar_name,
-                'timestamp': timestamp
+                'timestamp': timestamp,
+                'friendly': friendly
             }
             response = requests.post(api_url, data=payload, timeout=10)
             if response.status_code == 200:
-                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp})")
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with friendly '{friendly}'")
             else:
                 print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
         except Exception as e:
