@@ -490,36 +490,30 @@ def radar_service(message, nodeid):
             send_mail = True
     elif mail_setting:
         send_mail = True
-    if send_mail and mail_to:
-        mail_config = load_config().get('mail', {})
-        SMTP_SERVER = mail_config['smtp']['server']
-        SMTP_PORT = int(mail_config['smtp']['port'])
-        SMTP_USER = mail_config['smtp']['user']
-        SMTP_PASSWORD = mail_config['smtp']['password']
-        DEFAULT_SENDER_NAME = mail_config.get('default_sender', 'Mesh-Service')
-        from email.mime.text import MIMEText
-        import smtplib
-        now_full = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        subject = f"Radar alert from {radar_display_name()}"
-        content = f"{cleaned}\n\nRadar: {radar_display_name()}\nTime: {now_full}"
-        msg = MIMEText(content)
-        msg['Subject'] = subject
-        msg['From'] = f"{DEFAULT_SENDER_NAME} <{SMTP_USER}>"
-        msg['To'] = mail_to
-        try:
-            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-                server.starttls()
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.send_message(msg)
-            print(f"{datetime.now()} - Radar alert mail sent to {mail_to} (Radar: {radar_display_name()})")
-        except Exception as e:
-            print(f"{datetime.now()} - Error sending radar alert mail: {str(e)}")
     now = datetime.now().strftime('%H:%M:%S')
     cleaned_with_time = f"[{now}] {cleaned} (Radar: {radar_display_name()})"
     cli_path = get_meshtastic_cli_path()
     cmd = f"{cli_path} --ch-index {radar_channel} --sendtext '{cleaned_with_time}'"
     global ser
     ser_was_open = False
+    radar_api_log = config.get('radar_api_log', {})
+    api_url = radar_api_log.get('url')
+    api_key = radar_api_log.get('key')
+    if api_url and api_key and radar_name:
+        try:
+            timestamp = int(time.time())
+            payload = {
+                'key': api_key,
+                'name': radar_name,
+                'timestamp': timestamp
+            }
+            response = requests.post(api_url, data=payload, timeout=10)
+            if response.status_code == 200:
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp})")
+            else:
+                print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
+        except Exception as e:
+            print(f"{datetime.now()} - Error sending Radar API Log: {str(e)}")
     try:
         try:
             if ser and ser.is_open:
@@ -548,15 +542,57 @@ def radar_service(message, nodeid):
             print(f"{datetime.now()} - Serial port reopened.")
     except Exception as e:
         print(f"{datetime.now()} - Error reopening serial port: {str(e)}")
+    if send_mail and mail_to:
+        mail_config = load_config().get('mail', {})
+        SMTP_SERVER = mail_config['smtp']['server']
+        SMTP_PORT = int(mail_config['smtp']['port'])
+        SMTP_USER = mail_config['smtp']['user']
+        SMTP_PASSWORD = mail_config['smtp']['password']
+        DEFAULT_SENDER_NAME = mail_config.get('default_sender', 'Mesh-Service')
+        from email.mime.text import MIMEText
+        import smtplib
+        now_full = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        subject = f"Radar alert from {radar_display_name()}"
+        content = f"{cleaned}\n\nRadar: {radar_display_name()}\nTime: {now_full}"
+        msg = MIMEText(content)
+        msg['Subject'] = subject
+        msg['From'] = f"{DEFAULT_SENDER_NAME} <{SMTP_USER}>"
+        msg['To'] = mail_to
+        try:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+            print(f"{datetime.now()} - Radar alert mail sent to {mail_to} (Radar: {radar_display_name()})")
+        except Exception as e:
+            print(f"{datetime.now()} - Error sending radar alert mail: {str(e)}")
+    radar_api_log = config.get('radar_api_log', {})
+    api_url = radar_api_log.get('url')
+    api_key = radar_api_log.get('key')
+    if api_url and api_key and radar_name:
+        try:
+            timestamp = int(time.time())
+            payload = {
+                'key': api_key,
+                'name': radar_name,
+                'timestamp': timestamp
+            }
+            response = requests.post(api_url, data=payload, timeout=10)
+            if response.status_code == 200:
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp})")
+            else:
+                print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
+        except Exception as e:
+            print(f"{datetime.now()} - Error sending Radar API Log: {str(e)}")
 
 def ignore_service(message, nodeid):
     pass
 
 def info_service(message, nodeid):
     services_config = load_services_config()
-    enabled = [name for name, active in services_config.items() if active and name in SERVICES and SERVICES[name]]
+    enabled = [name for name, active in services_config.items() if active and name in SERVICES and SERVICES[name] and name != 'radar']
     if not enabled:
-        enabled = [name for name in SERVICES if SERVICES[name]]
+        enabled = [name for name in SERVICES if SERVICES[name] and name != 'radar']
     enabled.sort()
     msg = "Aktivierte Services:\r" + '\r'.join([f"@{name}" for name in enabled])
     send_message_to_node(nodeid, msg)

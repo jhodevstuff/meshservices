@@ -37,6 +37,10 @@
     "api_key": "your-php-api-key"
   },
   "radar_channel_index": 3,
+  "radar_api_log": {
+    "url": "https://example.com/scripts/addDetection.php",
+    "key": "your-php-api-key"
+  },
   "radar": {
     "Radar-Sample": {
       "aliasName": "Sample Radar",
