@@ -474,9 +474,32 @@ def radar_service(message, nodeid):
         if not post_state_info:
             print(f"{datetime.now()} - Radar state info for '{radar_display_name()}' ignored (postStateInfo not enabled).")
             return
+    ghost = radar_settings.get("ghost", False)
     ignore = radar_settings.get("ignore", False)
     mail_setting = radar_settings.get("mail", False)
     mail_to = radar_settings.get("mail_to")
+    if ghost:
+        radar_api_log = config.get('radar_api_log', {})
+        api_url = radar_api_log.get('url')
+        api_key = radar_api_log.get('key')
+        if api_url and api_key and radar_name:
+            try:
+                timestamp = int(time.time())
+                label = alias_name if alias_name else radar_name
+                payload = {
+                    'key': api_key,
+                    'name': radar_name,
+                    'timestamp': timestamp,
+                    'label': label
+                }
+                response = requests.post(api_url, data=payload, timeout=10)
+                if response.status_code == 200:
+                    print(f"{datetime.now()} - [GHOST] Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
+                else:
+                    print(f"{datetime.now()} - [GHOST] Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
+            except Exception as e:
+                print(f"{datetime.now()} - [GHOST] Error sending Radar API Log: {str(e)}")
+        return
     if isinstance(ignore, str):
         if is_time_in_range(ignore):
             return 
@@ -502,16 +525,16 @@ def radar_service(message, nodeid):
     if api_url and api_key and radar_name:
         try:
             timestamp = int(time.time())
-            friendly = alias_name if alias_name else radar_name
+            label = alias_name if alias_name else radar_name
             payload = {
                 'key': api_key,
                 'name': radar_name,
                 'timestamp': timestamp,
-                'friendly': friendly
+                'label': label
             }
             response = requests.post(api_url, data=payload, timeout=10)
             if response.status_code == 200:
-                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with friendly '{friendly}'")
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
             else:
                 print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
         except Exception as e:
@@ -568,24 +591,6 @@ def radar_service(message, nodeid):
             print(f"{datetime.now()} - Radar alert mail sent to {mail_to} (Radar: {radar_display_name()})")
         except Exception as e:
             print(f"{datetime.now()} - Error sending radar alert mail: {str(e)}")
-    radar_api_log = config.get('radar_api_log', {})
-    api_url = radar_api_log.get('url')
-    api_key = radar_api_log.get('key')
-    if api_url and api_key and radar_name:
-        try:
-            timestamp = int(time.time())
-            payload = {
-                'key': api_key,
-                'name': radar_name,
-                'timestamp': timestamp
-            }
-            response = requests.post(api_url, data=payload, timeout=10)
-            if response.status_code == 200:
-                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp})")
-            else:
-                print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
-        except Exception as e:
-            print(f"{datetime.now()} - Error sending Radar API Log: {str(e)}")
 
 def ignore_service(message, nodeid):
     pass

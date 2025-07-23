@@ -48,6 +48,7 @@
       "ignore": false,
       "mail_to": "test@test.com",
       "postStateInfo": false,
+      "ghost": false,
       "detectionsToAlert": {
         "timeSpan": 60,
         "detections": 2
