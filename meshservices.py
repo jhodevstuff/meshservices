@@ -514,11 +514,12 @@ def radar_service(message, nodeid):
                     'key': api_key,
                     'name': radar_name,
                     'timestamp': timestamp,
-                    'label': label
+                    'label': label,
+                    'ghost': bool(ghost)
                 }
                 response = requests.post(api_url, data=payload, timeout=10)
                 if response.status_code == 200:
-                    print(f"{datetime.now()} - [GHOST] Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
+                    print(f"{datetime.now()} - [GHOST] Radar API Log sent for {radar_name} ({timestamp}) with label '{label}' (ghost={ghost})")
                 else:
                     print(f"{datetime.now()} - [GHOST] Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
             except Exception as e:
@@ -554,11 +555,12 @@ def radar_service(message, nodeid):
                 'key': api_key,
                 'name': radar_name,
                 'timestamp': timestamp,
-                'label': label
+                'label': label,
+                'ghost': bool(ghost)
             }
             response = requests.post(api_url, data=payload, timeout=10)
             if response.status_code == 200:
-                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}' (ghost={ghost})")
             else:
                 print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
         except Exception as e:
