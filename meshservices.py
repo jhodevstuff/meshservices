@@ -444,9 +444,33 @@ def radar_service(message, nodeid):
             return False
     if not hasattr(radar_service, "_detection_times"):
         radar_service._detection_times = {}
+    if not hasattr(radar_service, "_alarm_times"):
+        radar_service._alarm_times = {}
     detection_times = radar_service._detection_times
+    alarm_times = radar_service._alarm_times
     parts = cleaned.split()
     radar_name = parts[0] if parts else None
+    now_ts = time.time()
+    # LoRa signal too strong and may have triggered radar sensor - this is the fix
+    if radar_name:
+        if radar_name not in alarm_times:
+            alarm_times[radar_name] = []
+        ignore_ping = False
+        for h in [1, 2, 3]:
+            target = now_ts - h * 3600
+            for prev in alarm_times[radar_name]:
+                if abs(prev - target) <= 5:
+                    ignore_ping = True
+                    break
+            if ignore_ping:
+                break
+        if ignore_ping:
+            print(f"{datetime.now()} - Radar '{radar_name}': Maybe Node-Info Signal (+/-5s of {h}hrs). Ignoring alarm. LoRa signal too strong and may have triggered radar sensor ;)")
+            alarm_times[radar_name].append(now_ts)
+            alarm_times[radar_name] = alarm_times[radar_name][-60:]
+            return
+        alarm_times[radar_name].append(now_ts)
+        alarm_times[radar_name] = alarm_times[radar_name][-60:]
     is_notify = any(p.lower() == "$notify" for p in parts)
     radar_settings = radar_config.get(radar_name, {"mail": False, "ignore": False})
     alias_name = radar_settings.get("aliasName")
