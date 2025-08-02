@@ -425,7 +425,10 @@ def radar_service(message, nodeid):
     cleaned = message.replace('#', '').strip()
     config = load_config()
     radar_channel = config.get('radar_channel_index', 3)
-    radar_config = config.get('radar', {})
+    def load_radar_config():
+        with open('radarconfig.json') as f:
+            return json.load(f)
+    radar_config = load_radar_config()
     import re
     from datetime import datetime
     def is_time_in_range(timerange):
