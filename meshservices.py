@@ -474,18 +474,18 @@ def radar_service(message, nodeid):
             return
         alarm_times[radar_name].append(now_ts)
         alarm_times[radar_name] = alarm_times[radar_name][-60:]
-    is_notify = any(p.lower() == "$notify" for p in parts)
-    radar_settings = radar_config.get(radar_name, {"mail": False, "ignore": False})
-    alias_name = radar_settings.get("aliasName")
+    radar_settings = radar_config.get(radar_name, {"sendEmail": False, "enabled": True})
+    if not radar_settings.get("enabled", True):
+        print(f"{datetime.now()} - Radar '{radar_name}' is disabled via config.")
+        return
+    display_name = radar_settings.get("name") or radar_name
     def radar_display_name():
-        if alias_name:
-            return f"{radar_name} ({alias_name})"
-        return radar_name
-    dta = radar_settings.get("detectionsToAlert", {"timeSpan": 0, "detections": 0})
-    dta_time = int(dta.get("timeSpan", 0))
-    dta_count = int(dta.get("detections", 0))
+        return f"{radar_name} ({display_name})" if display_name != radar_name else radar_name
+    fail_safe = radar_settings.get("failSafeTrigger", False)
     allow_trigger = True
-    if dta_time > 0 and dta_count > 0:
+    if fail_safe:
+        dta_time = 90
+        dta_count = 2
         now_ts = time.time()
         if radar_name not in detection_times:
             detection_times[radar_name] = []
@@ -494,53 +494,47 @@ def radar_service(message, nodeid):
         if len(detection_times[radar_name]) < dta_count:
             allow_trigger = False
     if not allow_trigger:
-        print(f"{datetime.now()} - Radar '{radar_display_name()}': Not enough detections ({len(detection_times[radar_name])}/{dta_count}) in {dta_time}s.")
+        print(f"{datetime.now()} - Radar '{radar_display_name()}': Not enough detections for failSafeTrigger ({len(detection_times[radar_name])}/2 in 90s).")
         return
     if "state:" in cleaned:
-        post_state_info = radar_settings.get("postStateInfo", False)
-        if not post_state_info:
-            print(f"{datetime.now()} - Radar state info for '{radar_display_name()}' ignored (postStateInfo not enabled).")
-            return
-    ghost = radar_settings.get("ghost", False)
-    ignore = radar_settings.get("ignore", False)
-    mail_setting = radar_settings.get("mail", False)
-    mail_to = radar_settings.get("mail_to")
-    if ghost:
+        print(f"{datetime.now()} - Radar state info for '{radar_display_name()}' ignored (postStateInfo always false).")
+        return
+    notify_setting = radar_settings.get("notify", True)
+    notify_active = False
+    if isinstance(notify_setting, str):
+        notify_active = is_time_in_range(notify_setting)
+    else:
+        notify_active = bool(notify_setting)
+    mail_to = radar_settings.get("sendEmail", "")
+    mail_to = mail_to.strip() if isinstance(mail_to, str) else ""
+    send_mail = False
+    if notify_active and mail_to:
+        send_mail = True
+    if not notify_active:
         radar_api_log = config.get('radar_api_log', {})
         api_url = radar_api_log.get('url')
         api_key = radar_api_log.get('key')
         if api_url and api_key and radar_name:
             try:
                 timestamp = int(time.time())
-                label = alias_name if alias_name else radar_name
+                label = display_name if display_name else radar_name
                 payload = {
                     'key': api_key,
                     'name': radar_name,
                     'timestamp': timestamp,
                     'label': label,
-                    'ghost': bool(ghost)
+                    'ghost': 'true'
                 }
                 response = requests.post(api_url, data=payload, timeout=10)
                 if response.status_code == 200:
-                    print(f"{datetime.now()} - [GHOST] Radar API Log sent for {radar_name} ({timestamp}) with label '{label}' (ghost={ghost})")
+                    print(f"{datetime.now()} - [GHOST] Radar API POST sent for {radar_name} ({timestamp}) with label '{label}' (ghost=true)")
                 else:
-                    print(f"{datetime.now()} - [GHOST] Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
+                    print(f"{datetime.now()} - [GHOST] Radar API POST failed for {radar_name}: {response.status_code} {response.text}")
             except Exception as e:
-                print(f"{datetime.now()} - [GHOST] Error sending Radar API Log: {str(e)}")
+                print(f"{datetime.now()} - [GHOST] Error sending Radar API POST: {str(e)}")
+        print(f"{datetime.now()} - Radar '{radar_display_name()}': notify is not active (notify={notify_setting}).")
         return
-    if isinstance(ignore, str):
-        if is_time_in_range(ignore):
-            return 
-    elif ignore:
-        return
-    send_mail = False
-    if is_notify:
-        send_mail = True
-    elif isinstance(mail_setting, str):
-        if is_time_in_range(mail_setting):
-            send_mail = True
-    elif mail_setting:
-        send_mail = True
+
     now = datetime.now().strftime('%H:%M:%S')
     cleaned_with_time = f"[{now}] {cleaned} (Radar: {radar_display_name()})"
     cli_path = get_meshtastic_cli_path()
@@ -553,17 +547,16 @@ def radar_service(message, nodeid):
     if api_url and api_key and radar_name:
         try:
             timestamp = int(time.time())
-            label = alias_name if alias_name else radar_name
+            label = display_name if display_name else radar_name
             payload = {
                 'key': api_key,
                 'name': radar_name,
                 'timestamp': timestamp,
                 'label': label,
-                'ghost': bool(ghost)
             }
             response = requests.post(api_url, data=payload, timeout=10)
             if response.status_code == 200:
-                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}' (ghost={ghost})")
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
             else:
                 print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
         except Exception as e:
@@ -596,7 +589,7 @@ def radar_service(message, nodeid):
             print(f"{datetime.now()} - Serial port reopened.")
     except Exception as e:
         print(f"{datetime.now()} - Error reopening serial port: {str(e)}")
-    if send_mail and mail_to:
+    if send_mail:
         mail_config = load_config().get('mail', {})
         SMTP_SERVER = mail_config['smtp']['server']
         SMTP_PORT = int(mail_config['smtp']['port'])
