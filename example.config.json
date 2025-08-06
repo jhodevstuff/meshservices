@@ -16,43 +16,30 @@
     "echo": true
   },
   "log": {
-    "enabled": false,
-    "api_url": "https://example.com/api/meshlog.php",
-    "api_key": "your-log-api-key"
+    "enabled": true,
+    "api_url": "https://example.com/meshlog.php",
+    "api_key": "key"
   },
   "mail": {
     "smtp": {
       "server": "smtp.example.com",
       "port": "587",
-      "user": "user@example.com",
-      "password": "your-smtp-password"
+      "user": "mail@example.com",
+      "password": "pass"
     },
-    "default_sender": "Mesh-Service"
+    "default_sender": "Meshtastic-Service"
   },
   "weather": {
-    "api_key": "your-weather-api-key",
+    "api_key": "",
     "provider": "wttr.in"
   },
   "php": {
-    "api_key": "your-php-api-key"
+    "api_key": "key"
   },
   "radar_channel_index": 3,
   "radar_api_log": {
-    "url": "https://example.com/scripts/addDetection.php",
-    "key": "your-php-api-key"
+    "url": "https://example.com/addDetection.php",
+    "key": "key"
   },
-  "radar": {
-    "Radar-Sample": {
-      "aliasName": "Sample Radar",
-      "mail": "02:00-06:00",
-      "ignore": false,
-      "mail_to": "test@test.com",
-      "postStateInfo": false,
-      "ghost": false,
-      "detectionsToAlert": {
-        "timeSpan": 60,
-        "detections": 2
-      }
-    }
-  }
+  "radarConfigUpdateUrl": "https://example.com/radarconfig.json"
 }

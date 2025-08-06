@@ -26,6 +26,20 @@ last_warn_check = None
 
 warned_ids = set()
 
+def update_radar_config_loop():
+    while True:
+        try:
+            config = load_config()
+            url = config.get('radarConfigUpdateUrl')
+            if url:
+                resp = requests.get(url, timeout=20)
+                if resp.status_code == 200:
+                    with open('radarconfig.json', 'w', encoding='utf-8') as f:
+                        f.write(resp.text)
+        except Exception:
+            pass
+        time.sleep(60)
+
 def fetch_dwd_warnings():
     try:
         url = "https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json"
@@ -750,6 +764,9 @@ def main():
     # silent background fetching for @warn - but nobody asked
     warn_thread = threading.Thread(target=warn_background_loop, daemon=True)
     warn_thread.start()
+
+    radar_update_thread = threading.Thread(target=update_radar_config_loop, daemon=True)
+    radar_update_thread.start()
 
     while True:
         try:
