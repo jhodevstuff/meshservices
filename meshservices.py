@@ -489,6 +489,7 @@ def radar_service(message, nodeid):
         alarm_times[radar_name].append(now_ts)
         alarm_times[radar_name] = alarm_times[radar_name][-60:]
     radar_settings = radar_config.get(radar_name, {"sendEmail": False, "enabled": True})
+    trigger_urls = radar_settings.get("triggerUrls", [])
     if not radar_settings.get("enabled", True):
         print(f"{datetime.now()} - Radar '{radar_name}' is disabled via config.")
         return
@@ -548,6 +549,13 @@ def radar_service(message, nodeid):
                 print(f"{datetime.now()} - [GHOST] Error sending Radar API POST: {str(e)}")
         print(f"{datetime.now()} - Radar '{radar_display_name()}': notify is not active (notify={notify_setting}).")
         return
+    if trigger_urls and notify_active:
+        for url in trigger_urls:
+            try:
+                threading.Thread(target=lambda u: requests.get(u, timeout=5), args=(url,), daemon=True).start()
+                print(f"{datetime.now()} - TriggerUrl GET request fired: {url}")
+            except Exception as e:
+                print(f"{datetime.now()} - Error firing triggerUrl {url}: {str(e)}")
 
     now = datetime.now().strftime('%H:%M:%S')
     cleaned_with_time = f"[{now}] {cleaned} (Radar: {radar_display_name()})"

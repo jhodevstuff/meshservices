@@ -18,7 +18,8 @@
     "enabled": true,
     "sendEmail": "mail@example.com",
     "notify": true,
-    "failSafeTrigger": true
+    "failSafeTrigger": true,
+    "triggerUrls": ["http://localhost:8080/beep"]
   },
   "Radar-4": {
     "name": "Fahrrad",
