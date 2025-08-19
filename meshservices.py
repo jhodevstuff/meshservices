@@ -68,7 +68,7 @@ def fetch_dwd_warnings():
         print(f"{datetime.now()} - Error fetching warnings: {e}")
         return [], []
 
-def warn_service(message, nodeid):
+def warn_service(message, nodeid, msg_id=None):
     # call @warn for current state
     bayern_warnings, bayern_cat = fetch_dwd_warnings()
     meldungen = []
@@ -177,7 +177,7 @@ def log_json_message(entry, log_file, api_url, api_key):
         print(f"{datetime.now()} - Error on POST: {str(e)}")
 
 # Service @mail (not functional for now)
-def mail_service(message, nodeid):
+def mail_service(message, nodeid, msg_id=None):
     import re
     if nodeid.startswith('0x'):
         nodeid = '!' + nodeid[2:]
@@ -255,12 +255,12 @@ def mail_service(message, nodeid):
         send_message_to_node(nodeid, help_text)
 
 # Service @test
-def test_service(message, nodeid):
+def test_service(message, nodeid, msg_id=None):
     test_text = "Ack test."
     send_message_to_node(nodeid, test_text)
 
 # Service @wetter
-def weather_service(message, nodeid):
+def weather_service(message, nodeid, msg_id=None):
     weather_config = load_config().get('weather', {})
     provider = weather_config.get('provider', 'wttr.in')
     arg = message.strip()
@@ -297,7 +297,7 @@ def weather_service(message, nodeid):
         send_message_to_node(nodeid, f"Fehler beim Abrufen des Wetters: {str(e)}")
 
 # Service @google
-def google_service(message, nodeid):
+def google_service(message, nodeid, msg_id=None):
     query = message.strip()
     print(f"{datetime.now()} - [Google-Service] Called with query: '{query}' for NodeID: {nodeid}")
     if not query:
@@ -352,7 +352,7 @@ def google_service(message, nodeid):
     send_message_to_node(nodeid, antwort)
 
 # Service @news
-def news_service(message, nodeid):
+def news_service(message, nodeid, msg_id=None):
     import feedparser
     try:
         feed_url = "https://www.tagesschau.de/xml/rss2"
@@ -373,7 +373,7 @@ def news_service(message, nodeid):
         send_message_to_node(nodeid, f"Fehler beim Laden der Nachrichten: {e}")
 
 # Service @wiki
-def wiki_service(message, nodeid):
+def wiki_service(message, nodeid, msg_id=None):
     import wikipedia
     query = message.strip()
     if not query:
@@ -399,7 +399,7 @@ def wiki_service(message, nodeid):
     send_message_to_node(nodeid, "Kein Wikipedia-Artikel dazu gefunden, sorry.")
 
 # Service @translate
-def translate_service(message, nodeid):
+def translate_service(message, nodeid, msg_id=None):
     from googletrans import Translator
     try:
         parts = message.strip().split(None, 1)
@@ -435,7 +435,7 @@ def extract_text_message(raw):
 
 # Service @radar (WIP / please adjust)
 # Usage: Detection Sensor Module Message with @radar xyz
-def radar_service(message, nodeid):
+def radar_service(message, nodeid, msg_id=None):
     cleaned = message.replace('#', '').strip()
     config = load_config()
     radar_channel = config.get('radar_channel_index', 3)
@@ -525,6 +525,7 @@ def radar_service(message, nodeid):
     send_mail = False
     if notify_active and mail_to:
         send_mail = True
+    rebroadcast_enabled = radar_settings.get("rebroadcast", True)
     if not notify_active:
         radar_api_log = config.get('radar_api_log', {})
         api_url = radar_api_log.get('url')
@@ -540,6 +541,8 @@ def radar_service(message, nodeid):
                     'label': label,
                     'ghost': 'true'
                 }
+                if msg_id:
+                    payload['messageId'] = msg_id
                 response = requests.post(api_url, data=payload, timeout=10)
                 if response.status_code == 200:
                     print(f"{datetime.now()} - [GHOST] Radar API POST sent for {radar_name} ({timestamp}) with label '{label}' (ghost=true)")
@@ -559,10 +562,45 @@ def radar_service(message, nodeid):
 
     now = datetime.now().strftime('%H:%M:%S')
     cleaned_with_time = f"[{now}] {cleaned} (Radar: {radar_display_name()})"
-    cli_path = get_meshtastic_cli_path()
-    cmd = f"{cli_path} --ch-index {radar_channel} --sendtext '{cleaned_with_time}'"
-    global ser
-    ser_was_open = False
+    if rebroadcast_enabled and notify_active:
+        cli_path = get_meshtastic_cli_path()
+        cmd = f"{cli_path} --ch-index {radar_channel} --sendtext '{cleaned_with_time}'"
+        global ser
+        ser_was_open = False
+        
+        try:
+            try:
+                if ser and ser.is_open:
+                    ser.close()
+                    ser_was_open = True
+                    print(f"{datetime.now()} - Serial port closed for sending (Radar).")
+            except Exception:
+                pass
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL)
+            if result.returncode != 0 or result.stderr:
+                raise Exception(result.stderr)
+            print(f"{datetime.now()} - Radar message sent to channel {radar_channel}: {cleaned_with_time}")
+        except Exception as e:
+            print(f"{datetime.now()} - Error on first attempt to send to channel {radar_channel}: {str(e)}. Second attempt with 30s timeout...")
+            try:
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+                if result.returncode != 0 or result.stderr:
+                    raise Exception(result.stderr)
+                print(f"{datetime.now()} - Radar message sent to channel {radar_channel} on second attempt: {cleaned_with_time}")
+            except Exception as e2:
+                print(f"{datetime.now()} - Error on second attempt to send to channel {radar_channel}: {str(e2)}")
+        time.sleep(2)
+        try:
+            if ser_was_open and not ser.is_open:
+                ser.open()
+                print(f"{datetime.now()} - Serial port reopened.")
+        except Exception as e:
+            print(f"{datetime.now()} - Error reopening serial port: {str(e)}")
+    else:
+        if not rebroadcast_enabled:
+            print(f"{datetime.now()} - Radar '{radar_display_name()}': rebroadcast is disabled.")
+        if not notify_active:
+            print(f"{datetime.now()} - Radar '{radar_display_name()}': notify is not active.")
     radar_api_log = config.get('radar_api_log', {})
     api_url = radar_api_log.get('url')
     api_key = radar_api_log.get('key')
@@ -576,6 +614,8 @@ def radar_service(message, nodeid):
                 'timestamp': timestamp,
                 'label': label,
             }
+            if msg_id:
+                payload['messageId'] = msg_id
             response = requests.post(api_url, data=payload, timeout=10)
             if response.status_code == 200:
                 print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
@@ -583,34 +623,6 @@ def radar_service(message, nodeid):
                 print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
         except Exception as e:
             print(f"{datetime.now()} - Error sending Radar API Log: {str(e)}")
-    try:
-        try:
-            if ser and ser.is_open:
-                ser.close()
-                ser_was_open = True
-                print(f"{datetime.now()} - Serial port closed for sending (Radar).")
-        except Exception:
-            pass
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL)
-        if result.returncode != 0 or result.stderr:
-            raise Exception(result.stderr)
-        print(f"{datetime.now()} - Radar message sent to channel {radar_channel}: {cleaned_with_time}")
-    except Exception as e:
-        print(f"{datetime.now()} - Error on first attempt to send to channel {radar_channel}: {str(e)}. Second attempt with 30s timeout...")
-        try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
-            if result.returncode != 0 or result.stderr:
-                raise Exception(result.stderr)
-            print(f"{datetime.now()} - Radar message sent to channel {radar_channel} on second attempt: {cleaned_with_time}")
-        except Exception as e2:
-            print(f"{datetime.now()} - Error on second attempt to send to channel {radar_channel}: {str(e2)}")
-    time.sleep(2)
-    try:
-        if ser_was_open and not ser.is_open:
-            ser.open()
-            print(f"{datetime.now()} - Serial port reopened.")
-    except Exception as e:
-        print(f"{datetime.now()} - Error reopening serial port: {str(e)}")
     if send_mail:
         mail_config = load_config().get('mail', {})
         SMTP_SERVER = mail_config['smtp']['server']
@@ -636,10 +648,10 @@ def radar_service(message, nodeid):
         except Exception as e:
             print(f"{datetime.now()} - Error sending radar alert mail: {str(e)}")
 
-def ignore_service(message, nodeid):
+def ignore_service(message, nodeid, msg_id=None):
     pass
 
-def info_service(message, nodeid):
+def info_service(message, nodeid, msg_id=None):
     services_config = load_services_config()
     enabled = [name for name, active in services_config.items() if active and name in SERVICES and SERVICES[name] and name != 'radar']
     if not enabled:
@@ -648,7 +660,7 @@ def info_service(message, nodeid):
     msg = "Aktivierte Services:\r" + '\r'.join([f"@{name}" for name in enabled])
     send_message_to_node(nodeid, msg)
 
-def echo_service(message, nodeid):
+def echo_service(message, nodeid, msg_id=None):
     if nodeid.startswith('0x'):
         nodeid = '!' + nodeid[2:]
     msg = message.strip()
@@ -820,16 +832,17 @@ def main():
                             if msg_data:
                                 text = msg_data['text'].lstrip()
                                 nodeid = msg_data['from']
+                                msg_id = msg_data['msg_id']
                                 if text.startswith('@'):
                                     # extract possible service call name
                                     match = re.match(r"@([a-zA-Z0-9_\-]+)", text)
                                     if match:
                                         servicename = match.group(1).lower()
                                         content = text[match.end():].lstrip()
-                                        print(f"{datetime.now()} - Service call detected: @{servicename} (NodeID: {nodeid}) with content: '{content}'")
+                                        print(f"{datetime.now()} - Service call detected: @{servicename} (NodeID: {nodeid}, MsgID: {msg_id}) with content: '{content}'")
                                         if servicename in SERVICES and SERVICES[servicename]:
                                             if is_service_enabled(servicename):
-                                                SERVICES[servicename](content, nodeid)
+                                                SERVICES[servicename](content, nodeid, msg_id)
                                             else:
                                                 print(f"{datetime.now()} - Service @{servicename} is disabled.")
                                         else:
