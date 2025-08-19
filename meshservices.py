@@ -552,6 +552,29 @@ def radar_service(message, nodeid, msg_id=None):
                 print(f"{datetime.now()} - [GHOST] Error sending Radar API POST: {str(e)}")
         print(f"{datetime.now()} - Radar '{radar_display_name()}': notify is not active (notify={notify_setting}).")
         return
+    radar_api_log = config.get('radar_api_log', {})
+    api_url = radar_api_log.get('url')
+    api_key = radar_api_log.get('key')
+    if api_url and api_key and radar_name and notify_active:
+        try:
+            timestamp = int(time.time())
+            label = display_name if display_name else radar_name
+            payload = {
+                'key': api_key,
+                'name': radar_name,
+                'timestamp': timestamp,
+                'label': label,
+            }
+            if msg_id:
+                payload['messageId'] = msg_id
+            response = requests.post(api_url, data=payload, timeout=10)
+            if response.status_code == 200:
+                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
+            else:
+                print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
+        except Exception as e:
+            print(f"{datetime.now()} - Error sending Radar API Log: {str(e)}")
+
     if trigger_urls and notify_active:
         for url in trigger_urls:
             try:
@@ -601,28 +624,6 @@ def radar_service(message, nodeid, msg_id=None):
             print(f"{datetime.now()} - Radar '{radar_display_name()}': rebroadcast is disabled.")
         if not notify_active:
             print(f"{datetime.now()} - Radar '{radar_display_name()}': notify is not active.")
-    radar_api_log = config.get('radar_api_log', {})
-    api_url = radar_api_log.get('url')
-    api_key = radar_api_log.get('key')
-    if api_url and api_key and radar_name:
-        try:
-            timestamp = int(time.time())
-            label = display_name if display_name else radar_name
-            payload = {
-                'key': api_key,
-                'name': radar_name,
-                'timestamp': timestamp,
-                'label': label,
-            }
-            if msg_id:
-                payload['messageId'] = msg_id
-            response = requests.post(api_url, data=payload, timeout=10)
-            if response.status_code == 200:
-                print(f"{datetime.now()} - Radar API Log sent for {radar_name} ({timestamp}) with label '{label}'")
-            else:
-                print(f"{datetime.now()} - Radar API Log failed for {radar_name}: {response.status_code} {response.text}")
-        except Exception as e:
-            print(f"{datetime.now()} - Error sending Radar API Log: {str(e)}")
     if send_mail:
         mail_config = load_config().get('mail', {})
         SMTP_SERVER = mail_config['smtp']['server']
