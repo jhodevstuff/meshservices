@@ -42,16 +42,22 @@ def update_radar_config_loop():
 
 def fetch_dwd_warnings():
     try:
+        config = load_config()
+        warnings_config = config.get('warnings', {})
+        state_short = warnings_config.get('stateShort', 'BY')
+        min_level = warnings_config.get('minLevel', 2)
+        region_name = warnings_config.get('regionName', 'Bayern')
+        
         url = "https://warnung.bund.de/bbk.mowas/gefahrendurchsagen.json"
         dwd_url = "https://warnung.bund.de/bbk.dwd/unwetter.json"
         resp = requests.get(dwd_url, timeout=10)
         data = resp.json()
-        bayern_warnings = [warn for warn in data if warn.get('stateShort') == 'BY' and warn.get('level', 0) >= 3]
+        bayern_warnings = [warn for warn in data if warn.get('stateShort') == state_short and warn.get('level', 0) >= min_level]
         resp2 = requests.get(url, timeout=10)
         data2 = resp2.json()
         bayern_cat = []
         for w in data2:
-            if w.get('stateShort') == 'BY':
+            if w.get('stateShort') == state_short:
                 bayern_cat.append(w)
             else:
                 info = w.get('info')
@@ -60,7 +66,7 @@ def fetch_dwd_warnings():
                     if isinstance(areas, list):
                         for area in areas:
                             area_desc = area.get('areaDesc', '')
-                            if 'Bayern' in area_desc or 'BY' in area_desc:
+                            if region_name in area_desc or state_short in area_desc:
                                 bayern_cat.append(w)
                                 break
         return bayern_warnings, bayern_cat
@@ -70,6 +76,10 @@ def fetch_dwd_warnings():
 
 def warn_service(message, nodeid, msg_id=None):
     # call @warn for current state
+    config = load_config()
+    warnings_config = config.get('warnings', {})
+    region_name = warnings_config.get('regionName', 'Bayern')
+    
     bayern_warnings, bayern_cat = fetch_dwd_warnings()
     meldungen = []
     for w in bayern_warnings:
@@ -88,7 +98,7 @@ def warn_service(message, nodeid, msg_id=None):
     if meldungen:
         send_message_to_node(nodeid, '\n\n'.join(meldungen))
     else:
-        send_message_to_node(nodeid, "Keine aktuellen Unwetter- oder Katastrophenwarnungen für Bayern.")
+        send_message_to_node(nodeid, f"Keine aktuellen Unwetter- oder Katastrophenwarnungen für {region_name}.")
 
 def warn_background_loop():
     global warned_ids
@@ -99,7 +109,7 @@ def warn_background_loop():
         for w in bayern_warnings:
             wid = w.get('identifier')
             if wid and wid not in warned_ids:
-                meldungen.append(f"[AUTOWARN] DWD: {w.get('headline', w.get('event', 'Warnung'))} (Stufe {w.get('level')}) - {w.get('description', '')} [{w.get('stateShort','') or ''}]")
+                meldungen.append(f"[WARN BOT] DWD: {w.get('headline', w.get('event', 'Warnung'))} (Stufe {w.get('level')}) - {w.get('description', '')} [{w.get('stateShort','') or ''}]")
                 neue_ids.add(wid)
         for w in bayern_cat:
             wid = w.get('identifier')
@@ -111,9 +121,9 @@ def warn_background_loop():
                     area = ''
                     if 'area' in info[0] and isinstance(info[0]['area'], list) and info[0]['area']:
                         area = info[0]['area'][0].get('areaDesc', '')
-                    meldungen.append(f"[AUTOWARN] KAT: {headline} - {desc} [{area}]")
+                    meldungen.append(f"[WARN BOT] KAT: {headline} - {desc} [{area}]")
                 else:
-                    meldungen.append(f"[AUTOWARN] KAT: Warnung -  []")
+                    meldungen.append(f"[WARN BOT] KAT: Warnung -  []")
                 neue_ids.add(wid)
         if meldungen:
             for msg in meldungen:

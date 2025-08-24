@@ -41,5 +41,10 @@
     "url": "https://example.com/addDetection.php",
     "key": "key"
   },
-  "radarConfigUpdateUrl": "https://example.com/radarconfig.json"
+  "radarConfigUpdateUrl": "https://example.com/radarconfig.json",
+  "warnings": {
+    "stateShort": "BY",
+    "minLevel": 2,
+    "regionName": "Bayern"
+  }
 }
